@@ -1,0 +1,51 @@
+[DEBREATE-0.7.13]
+<<CTRL>>
+Package: djvudict
+Version: 0.0.1
+Maintainer: Alexander Trufanov <trufanovan@gmail.com>
+Section: graphics
+Source: https://github.com/trufanov-nok/djvudict
+Architecture: amd64
+Priority: optional
+Depends: libtiff5, libjbig0, libjpeg8, zlib1g, liblzma5, libc6, libstdc++6
+Description: DjVu dictionaries (Djbz/Sjbz) content dumper
+ A minidjvu-based tool that dumps Djbz and Sjbz content of DjVu documents
+ to BMP images as well as gather statistics of dictionaries usage.
+ It allows to investigate and compare the quality of different
+ DjVu encoders (in scope of JB2 images).
+
+<</CTRL>>
+<<FILES>>
+1
+/home/truf/dev/minidjvu/.libs/djvudict -> djvudict -> /usr/bin
+<</FILES>>
+<<SCRIPTS>>
+<<PREINST>>
+0
+<</PREINST>>
+<<POSTINST>>
+0
+<</POSTINST>>
+<<PRERM>>
+0
+<</PRERM>>
+<<POSTRM>>
+0
+<</POSTRM>>
+<</SCRIPTS>>
+<<CHANGELOG>>
+<<DEST>>DEFAULT<</DEST>>
+
+<</CHANGELOG>>
+<<COPYRIGHT>>
+
+<</COPYRIGHT>>
+<<MENU>>
+0
+<</MENU>>
+<<BUILD>>
+1
+1
+1
+strip
+<</BUILD>>
