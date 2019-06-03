@@ -39,17 +39,13 @@ int DjVuDirReader::decode(FILE * f, int32 size, mdjvu_error_t *perr, bool verbos
         return 0;
     }
     if (verbose) {
-        fprintf(stdout, "Bundled DjVu found. DIRM reports format version %d\n", flags & 0b01111111);
+        fprintf(stdout, "Bundled DjVu found. DIRM reports format version %u\n", flags & 0b01111111);
     }
 
     m_entries_cnt = read_uint16_most_significant_byte_first(f);
-    if (m_entries_cnt < 0) {
-        fprintf(stderr, "DJVM reports wrong file count (%d).\n", m_entries_cnt);
-        if (perr) *perr = mdjvu_get_error(mdjvu_error_corrupted_djvu);
-        return 0;
-    }
+
     if (verbose) {
-        fprintf(stdout, "Files bundled %d\n", m_entries_cnt);
+        fprintf(stdout, "Files bundled %u\n", m_entries_cnt);
     }
 
     m_entries = (DIRM_Entry*) malloc (m_entries_cnt* sizeof(DIRM_Entry));

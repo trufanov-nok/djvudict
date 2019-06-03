@@ -47,7 +47,7 @@ int mkpath(std::string path, int mode = 0755)
         if (dir.size()) {
             res = mkdir(dir.c_str(), mode);
             if (res == -1 && errno != EEXIST) {
-                fprintf(stderr, "mkdir failed for %s (error code %d, errno: %d - %s)", path.data(), res, errno, strerror(errno));
+                fprintf(stderr, "mkdir failed for %s (error code %u, errno: %d - %s)", path.data(), res, errno, strerror(errno));
                 return res;
             }
         }
@@ -208,13 +208,13 @@ mdjvu_image_t JB2Dumper::loadAndDumpJB2Image(FILE * f, int32 length, const Share
     {
         lib_alloc = lib_count = zp.decode(jb2.required_dictionary_size);
         shared_lib_size_used = lib_count;
-        log.log("Using shared dictionary with size:\t%d\n", lib_count);
+        log.log("Using shared dictionary with size:\t%u\n", lib_count);
         if (! shared_library || !shared_library->count) {
-            fprintf(stderr, "JB2 Image requires %d images from shared library which wasn't provided", lib_count);
+            fprintf(stderr, "JB2 Image requires %u images from shared library which wasn't provided", lib_count);
             COMPLAIN;
         }
         if (shared_library->count < lib_count) {
-            fprintf(stderr, "JB2 Image requires %d images but shared library has only", shared_library->count);
+            fprintf(stderr, "JB2 Image requires %u images but shared library has only", shared_library->count);
             COMPLAIN;
         }
         library = clone_library(shared_library->bitmaps, lib_count);
@@ -451,13 +451,13 @@ int JB2Dumper::dumpSjbz(FILE *f, IFFChunk *form, const char* out_path, mdjvu_err
 
         switch (chunk.id) {
         case CHUNK_ID_INFO: {
-            char * info =  (char *) calloc(chunk.length, sizeof(char));
+            unsigned char * info =  (unsigned char *) calloc(chunk.length, sizeof(char));
             int32 readed = fread(info, 1, chunk.length, f);
             assert(readed = chunk.length);
             assert(chunk.length >= 10);
             m_cur_dpi = info[6] | info[7] << 8;
             if (m_verbose) {
-                fprintf(stdout, "Reading page Info: w:%d h:%d ver:%d.%d dpi:%d\n",
+                fprintf(stdout, "Reading page Info: w:%u h:%u ver:%u.%u dpi:%u\n",
                         info[1]|info[0]<<8, info[3]|info[2]<<8, info[5], info[4], m_cur_dpi);
             }
             free(info);
@@ -520,7 +520,7 @@ int JB2Dumper::dumpMultiPage(FILE * f, const DIRM_Entry* entries, int size, cons
         }
 
         if (fseek(f, entry.offset, SEEK_SET)) {
-            fprintf(stderr, "ERROR: can't fseek to %d", entry.offset);
+            fprintf(stderr, "ERROR: can't fseek to %u", entry.offset);
             if (p_err) *p_err = mdjvu_get_error(mdjvu_error_corrupted_djvu);
             return 0;
         }
@@ -606,7 +606,7 @@ void LogFile::logAction(int32 action, int32 idx, bool in_shared_lib)
 {
     assert(action < 12);
     if (m_stats_f) {
-        fprintf(m_stats_f, "%s:\t%d%s\n", val_names[action], idx, in_shared_lib?" [shared dictionary usage]":"");
+        fprintf(m_stats_f, "%s:\t%u%s\n", val_names[action], idx, in_shared_lib?" [shared dictionary usage]":"");
         if (!in_shared_lib) {
 
         } else {
