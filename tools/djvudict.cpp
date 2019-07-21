@@ -19,7 +19,7 @@ bool verbose = true;
 const char *link_to_filename(const char *path_to_djvu) {
     int32 pos = strlen(path_to_djvu);
     while (pos > 0 && path_to_djvu[pos] != '/' && path_to_djvu[pos] != '\\') pos--;
-    return path_to_djvu + pos;
+    return path_to_djvu + pos +1;
 }
 
 uint32 dump_djvu_dict(const char *djvu_filepath, const char *out_path, mdjvu_error_t *perr)

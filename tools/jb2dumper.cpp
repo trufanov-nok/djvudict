@@ -239,37 +239,41 @@ mdjvu_image_t JB2Dumper::loadAndDumpJB2Image(FILE * f, int32 length, const Share
     while(1)
     {
         t = jb2.decode_record_type();
-        m_counters.count((Counters::CountersType)t);
+        long int size = 0;
         switch(t)
         {
-        case jb2_new_symbol_add_to_image_and_library:
+        case jb2_new_symbol_add_to_image_and_library: {
+            size = ftell(zp.file);
             *(append_to_list<mdjvu_bitmap_t>(library, lib_count, lib_alloc))
                     = decode_lib_shape(jb2, img, true, NULL);
             mdjvu_save_bmp(library[lib_count-1], get_filename(out_path, "lib", lib_count-1).data(), m_cur_dpi, perr);
             actions.logAction(t, lib_count-1);
-            m_counters.count(Counters::BitmapsAddedToLocalDict);
-            break;
-        case jb2_new_symbol_add_to_library_only:
+            size = ftell(zp.file) - size;
+            m_counters.count(Counters::BitmapsAddedToLocalDict, size);
+        } break;
+        case jb2_new_symbol_add_to_library_only: {
+            size = ftell(zp.file);
             *(append_to_list<mdjvu_bitmap_t>(library, lib_count, lib_alloc))
                     = decode_lib_shape(jb2, img, false, NULL);
 
             mdjvu_save_bmp(library[lib_count-1], get_filename(out_path, "lib", lib_count-1).data(), m_cur_dpi, perr);
             actions.logAction(t, lib_count-1);
-            m_counters.count(Counters::BitmapsAddedToLocalDict);
-            break;
-        case jb2_new_symbol_add_to_image_only:
-        {
+            size = ftell(zp.file) - size;
+            m_counters.count(Counters::BitmapsAddedToLocalDict, size);
+        } break;
+        case jb2_new_symbol_add_to_image_only: {
+            size = ftell(zp.file);
             jb2.decode(img);
             int32 index = mdjvu_image_get_bitmap_count(img);
             jb2.decode_blit(img, index-1);
 
             mdjvu_save_bmp(mdjvu_image_get_bitmap(img, index), get_filename(out_path, "img", index).data(), m_cur_dpi, perr);
             actions.logAction(t, index);
-            m_counters.count(Counters::UniqElementsOnPage);
-        }
-            break;
-        case jb2_matched_symbol_with_refinement_add_to_image_and_library:
-        {
+            size = ftell(zp.file) - size;
+            m_counters.count(Counters::UniqElementsOnPage, size);
+        } break;
+        case jb2_matched_symbol_with_refinement_add_to_image_and_library: {
+            size = ftell(zp.file);
             if (!lib_count)
             {
                 mdjvu_image_destroy(img);
@@ -283,11 +287,11 @@ mdjvu_image_t JB2Dumper::loadAndDumpJB2Image(FILE * f, int32 length, const Share
 
             mdjvu_save_bmp(library[lib_count-1], get_filename(out_path, "lib", lib_count-1).data(), m_cur_dpi, perr);
             actions.logAction(t, lib_count-1);
-            m_counters.count(Counters::BitmapsAddedToLocalDict);
-        }
-            break;
-        case jb2_matched_symbol_with_refinement_add_to_library_only:
-        {
+            size = ftell(zp.file) - size;
+            m_counters.count(Counters::BitmapsAddedToLocalDict, size);
+        } break;
+        case jb2_matched_symbol_with_refinement_add_to_library_only: {
+            size = ftell(zp.file);
             if (!lib_count)
             {
                 mdjvu_image_destroy(img);
@@ -301,11 +305,11 @@ mdjvu_image_t JB2Dumper::loadAndDumpJB2Image(FILE * f, int32 length, const Share
 
             mdjvu_save_bmp(library[lib_count-1], get_filename(out_path, "lib", lib_count-1).data(), m_cur_dpi, perr);
             actions.logAction(t, lib_count-1);
-            m_counters.count(Counters::BitmapsAddedToLocalDict);
-        }
-            break;
-        case jb2_matched_symbol_with_refinement_add_to_image_only:
-        {
+            size = ftell(zp.file) - size;
+            m_counters.count(Counters::BitmapsAddedToLocalDict, size);
+        } break;
+        case jb2_matched_symbol_with_refinement_add_to_image_only: {
+            size = ftell(zp.file);
             if (!lib_count)
             {
                 mdjvu_image_destroy(img);
@@ -320,16 +324,16 @@ mdjvu_image_t JB2Dumper::loadAndDumpJB2Image(FILE * f, int32 length, const Share
 
             mdjvu_save_bmp(mdjvu_image_get_bitmap(img, index), get_filename(out_path, "img", index).data(), m_cur_dpi, perr);
             actions.logAction(t, index, index < shared_lib_size_used);
+            size = ftell(zp.file) - size;
             if (index < shared_lib_size_used) {
-                m_counters.count(Counters::SharedDictUsage);
+                m_counters.count(Counters::SharedDictUsage, size);
             } else {
-                m_counters.count(Counters::LocalDictUsage);
+                m_counters.count(Counters::LocalDictUsage), size;
             }
-            m_counters.count(Counters::UniqElementsOnPage);
-        }
-            break;
-        case jb2_matched_symbol_copy_to_image_without_refinement:
-        {
+            m_counters.count(Counters::UniqElementsOnPage, size);
+        } break;
+        case jb2_matched_symbol_copy_to_image_without_refinement: {
+            size = ftell(zp.file);
             if (!lib_count)
             {
                 mdjvu_image_destroy(img);
@@ -355,15 +359,15 @@ mdjvu_image_t JB2Dumper::loadAndDumpJB2Image(FILE * f, int32 length, const Share
 
             mdjvu_save_bmp(shape, get_filename(out_path, "lib", match).data(), m_cur_dpi, perr);
             actions.logAction(t, match, match < shared_lib_size_used);
+            size = ftell(zp.file) - size;
             if (match < shared_lib_size_used) {
-                m_counters.count(Counters::SharedDictUsage);
+                m_counters.count(Counters::SharedDictUsage, size);
             } else {
-                m_counters.count(Counters::LocalDictUsage);
+                m_counters.count(Counters::LocalDictUsage, size);
             }
-        }
-            break;
-        case jb2_non_symbol_data:
-        {
+        } break;
+        case jb2_non_symbol_data: {
+            size = ftell(zp.file);
             mdjvu_bitmap_t bmp = jb2.decode(img);
             int32 x = zp.decode(jb2.symbol_column_number) - 1;
             int32 y = h - zp.decode(jb2.symbol_row_number);
@@ -371,24 +375,22 @@ mdjvu_image_t JB2Dumper::loadAndDumpJB2Image(FILE * f, int32 length, const Share
             mdjvu_image_add_blit(img, x, y, bmp);
             mdjvu_save_bmp(bmp, get_filename(out_path, "non_symb", index).data(), m_cur_dpi, perr);
             actions.logAction(t, index);
-            m_counters.count(Counters::UniqElementsOnPage);
-        }
-            break;
+            size = ftell(zp.file) - size;
+            m_counters.count(Counters::UniqElementsOnPage, size);
+        } break;
 
-        case jb2_require_dictionary_or_reset:
+        case jb2_require_dictionary_or_reset: {
             jb2.reset();
             actions.logAction(t);
-            break;
+        } break;
 
-        case jb2_comment:
-        {
+        case jb2_comment: {
             actions.logAction(t);
             int32 len = zp.decode(jb2.comment_length);
             while (len--) zp.decode(jb2.comment_octet);
-        }
-            break;
+        } break;
 
-        case jb2_end_of_data:
+        case jb2_end_of_data: {
             if (local_dict) {
                 local_dict->bitmaps = clone_library(library, lib_count);
                 local_dict->count = lib_count;
@@ -398,11 +400,14 @@ mdjvu_image_t JB2Dumper::loadAndDumpJB2Image(FILE * f, int32 length, const Share
             actions.logAction(t);
             free(library);
             return img;
+        }
         default:
             free(library);
             mdjvu_image_destroy(img);
             COMPLAIN;
         } // switch
+
+        m_counters.count((Counters::CountersType)t, size);
     } // while(1)
 }/*}}}*/
 
@@ -639,25 +644,34 @@ void LogFile::close()
 void Counters::resetPageCounters() {
     for (int i = 0; i < LastCounter; i++) {
         m_counters[i] = 0;
+        m_sizes[i] = 0;
     }
 }
 
 void Counters::clear() {
     resetPageCounters();
-    memcpy(m_total_counters, m_counters, LastCounter*sizeof(int));
+    memset(m_total_counters, 0, LastCounter*sizeof(int));
+    memset(m_total_sizes, 0, LastCounter*sizeof(int));
 }
 
-void Counters::count(CountersType cntr, int val)
+void Counters::count(CountersType cntr, int size, int val)
 {
     assert(cntr < LastCounter);
     m_counters[cntr] += val;
     m_total_counters[cntr] += val;
+    m_sizes[cntr] += size;
+    m_total_sizes[cntr] += size;
 }
 
 std::string Counters::getValue(CountersType cntr, bool total)
 {
     assert(cntr < LastCounter);
     int* buf = total? m_total_counters : m_counters;
-    std::string val = ":\t" + std::to_string(buf[cntr]) + "\n";
+    int* buf_size = total? m_total_sizes : m_sizes;
+    std::string val = ":\t" + std::to_string(buf[cntr]) +
+            " (" + std::to_string((double)(buf_size[cntr]*100/1024)/100) + " Kb";
+    if (buf[cntr]) {
+        val += ", Avg.: " + std::to_string((double)buf_size[cntr]/buf[cntr]) + " b)\n";
+    } else val += ")\n";
     return val_names[cntr] + val;
 }

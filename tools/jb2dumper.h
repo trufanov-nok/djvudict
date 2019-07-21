@@ -55,7 +55,7 @@ public:
     Counters(){}
     ~Counters(){}
 
-    void count(CountersType, int val = 1);
+    void count(CountersType, int size = 0, int val = 1);
     std::string getValue(CountersType cntr, bool total = false);
     void resetPageCounters();
     void clear();
@@ -63,6 +63,8 @@ public:
 private:
     int m_counters[LastCounter];
     int m_total_counters[LastCounter];
+    int m_sizes[LastCounter];
+    int m_total_sizes[LastCounter];
 };
 
 class JB2Dumper

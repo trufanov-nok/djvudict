@@ -5,8 +5,7 @@
 # Step by step:
 1. Get *minidjvu* sources (you may also check if it's buildable in your system)
 2. Copy content of `djvudict/tools` folder to tools subfolder of *minidjvu*
-3. Apply `Makefile.am.diff` patch to enable their compilation
-4. Apply `jb2coder.h.diff` patch to let djvu code access to one of private functions
+3. Apply `changes.diff` patch to enable their compilation and to let code access some minidjvu private functions
 5. Build *minidjvu* as usual
 
 # Example
@@ -24,8 +23,7 @@ cd ./minidjvu
 cp ../djvudict/tools/* ./tools/
 
 # apply patches
-git apply ../djvudict/Makefile.am.diff
-git apply ../djvudict/
+git apply ../djvudict/changes.diff
 
 # build minidjvu as described in its README
 autoreconf --install
