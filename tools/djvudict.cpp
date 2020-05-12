@@ -102,14 +102,14 @@ uint32 dump_djvu_dict(const char *djvu_filepath, const char *out_path, mdjvu_err
     return 1;
 }
 
-#define DICT_DUMPER_VERSION "0.0.1"
+#define DICT_DUMPER_VERSION "0.0.2"
 
 static void show_usage_and_exit(void)           /* {{{ */
 {
     const char *what_it_does = _("dumps djvu dictinaries content and usage statistics");
-    printf("djvudictdump %s - %s\n", DICT_DUMPER_VERSION, what_it_does);
+    printf("djvudict %s - %s\n", DICT_DUMPER_VERSION, what_it_does);
     printf(_("Usage:\n"));
-    printf(_("    djvudictdump [options] <input file> <output folder>\n"));
+    printf(_("    djvudict [options] <input file> <output folder>\n"));
     printf(_("Formats supported:\n"));
     printf(_("    DjVu (single-page), DjVu (bundled multi-page)\n"));
 //    printf(_("Options:\n"));
