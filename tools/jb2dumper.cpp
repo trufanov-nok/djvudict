@@ -108,10 +108,12 @@ void JB2Dumper::close()
     if (m_shared_dict_cnt) {
         for (int32 i = 0; i < m_shared_dict_cnt; i++) {
             SharedDictInfo& dict = m_shared_dicts[i];
-            for (int32 j = 0; j < dict.count; j++) {
-                mdjvu_bitmap_destroy(dict.bitmaps[j]);
+            if (dict.bitmaps) {
+                for (int32 j = 0; j < dict.count; j++) {
+                    mdjvu_bitmap_destroy(dict.bitmaps[j]);
+                }
+                free(dict.bitmaps);
             }
-            free(dict.bitmaps);
         }
         free(m_shared_dicts);
         m_dict_buf_allocated = 0;
@@ -121,7 +123,9 @@ void JB2Dumper::close()
 
 mdjvu_bitmap_t * clone_library(mdjvu_bitmap_t * library, int32 size)
 {
-    assert(library && size > 0);
+    if (!library || size == 0) {
+        return NULL;
+    }
     mdjvu_bitmap_t * res = (mdjvu_bitmap_t *) malloc(size * sizeof(mdjvu_bitmap_t));
     for (int32 i = 0; i < size; i++) {
         res[i] = mdjvu_bitmap_clone(library[i]);
@@ -210,8 +214,9 @@ mdjvu_image_t JB2Dumper::loadAndDumpJB2Image(FILE * f, int32 length, const Share
         shared_lib_size_used = lib_count;
         log.log("Using shared dictionary with size:\t%u\n", lib_count);
         if (! shared_library || !shared_library->count) {
-            fprintf(stderr, "JB2 Image requires %u images from shared library which wasn't provided", lib_count);
-            COMPLAIN;
+            fprintf(stderr, "JB2 Image requires %u images from shared library which wasn't provided\n", lib_count);
+            if (perr) *perr = mdjvu_get_error(mdjvu_error_corrupted_jb2);
+            //COMPLAIN;
         }
         if (shared_library->count < lib_count) {
             fprintf(stderr, "JB2 Image requires %u images but shared library has only", shared_library->count);
