@@ -1,4 +1,5 @@
 #include "djvudirreader.h"
+#include <cstdlib>
 #include <memory>
 #include <assert.h>
 #include "bsdecoder.h"
