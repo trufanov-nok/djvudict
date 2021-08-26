@@ -59,7 +59,7 @@ uint32 dump_djvu_dict(const char *djvu_filepath, const char *out_path, mdjvu_err
         single_page.type = Page;
         // should be FORM start
         single_page.offset = ftell(f) - 8 /*FORM header*/ - 4 /*DJVU tag*/;
-        const char flags = 0b10000001;
+        const char flags = 0x81; // 0b10000001;
         single_page.str_flags = &flags;
         single_page.id_str = link_to_filename(djvu_filepath);
         single_page.name_str = NULL;

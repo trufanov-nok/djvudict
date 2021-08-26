@@ -34,13 +34,13 @@ int DjVuDirReader::decode(FILE * f, int32 size, mdjvu_error_t *perr, bool verbos
     close(); // free and null buffers
 
     unsigned char flags = (unsigned char) fgetc(f);
-    if (!(flags & 0b10000000)) {
+    if (!(flags & 0x80 /*0b10000000*/)) {
         fprintf(stderr, "DjVu is inderectly coded. We support only bundled multi-page DjVu documents.\n");
         if (perr) *perr = mdjvu_get_error(mdjvu_error_corrupted_djvu);
         return 0;
     }
     if (verbose) {
-        fprintf(stdout, "Bundled DjVu found. DIRM reports format version %u\n", flags & 0b01111111);
+        fprintf(stdout, "Bundled DjVu found. DIRM reports format version %u\n", flags & 0x7F /*0b01111111*/);
     }
 
     m_entries_cnt = read_uint16_most_significant_byte_first(f);
@@ -86,21 +86,21 @@ int DjVuDirReader::decode(FILE * f, int32 size, mdjvu_error_t *perr, bool verbos
         skip_till_next_str(m_buf, buf_pos);
 
         unsigned char flag = *m_entries[i].str_flags;
-        if (flag & 0b10000000) {
+        if (flag & 0x80 /*0b10000000*/) {
             m_entries[i].name_str = m_buf + buf_pos;
             skip_till_next_str(m_buf, buf_pos);
         } else {
             m_entries[i].name_str = NULL;
         }
 
-        if (flag & 0b01000000) {
+        if (flag & 0x40 /*0b01000000*/) {
             m_entries[i].title_str = m_buf + buf_pos;
             skip_till_next_str(m_buf, buf_pos);
         } else {
             m_entries[i].name_str = NULL;
         }
 
-        m_entries[i].type = (DIRM_EntryType) (flag & 0b00111111);
+        m_entries[i].type = (DIRM_EntryType) (flag & 0x3F /*0b00111111*/);
     }
 
     return 1 + 2 + 4*m_entries_cnt + size_left;
