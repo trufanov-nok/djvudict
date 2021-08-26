@@ -151,7 +151,7 @@ append_to_list(T *&list, int32 &count, int32 &allocated)
 }
 
 static mdjvu_bitmap_t decode_lib_shape/*{{{*/
-(JB2Decoder &jb2, mdjvu_image_t img, bool with_blit, mdjvu_bitmap_t proto)
+(JB2Decoder &jb2, mdjvu_image_t img, bool with_blit, mdjvu_bitmap_t proto, int32 *img_x = 0, int32 *img_y = 0)
 {
     int32 blit = -1; // to please compilers
     int32 index = mdjvu_image_get_bitmap_count(img);
@@ -167,8 +167,12 @@ static mdjvu_bitmap_t decode_lib_shape/*{{{*/
 
     if (with_blit)
     {
-        mdjvu_image_set_blit_x(img, blit, mdjvu_image_get_blit_x(img, blit) + x);
-        mdjvu_image_set_blit_y(img, blit, mdjvu_image_get_blit_y(img, blit) + y);
+        x = mdjvu_image_get_blit_x(img, blit) + x;
+        y = mdjvu_image_get_blit_y(img, blit) + y;
+        mdjvu_image_set_blit_x(img, blit, x);
+        mdjvu_image_set_blit_y(img, blit, y);
+        if (img_x) *img_x = x;
+        if (img_y) *img_y = x;
     }
 
     return shape;
@@ -248,11 +252,12 @@ mdjvu_image_t JB2Dumper::loadAndDumpJB2Image(FILE * f, int32 length, const Share
         switch(t)
         {
         case jb2_new_symbol_add_to_image_and_library: {
+            int32 img_x; int32 img_y;
             size = ftell(zp.file);
             *(append_to_list<mdjvu_bitmap_t>(library, lib_count, lib_alloc))
-                    = decode_lib_shape(jb2, img, true, NULL);
+                    = decode_lib_shape(jb2, img, true, NULL, &img_x, &img_y);
             mdjvu_save_bmp(library[lib_count-1], get_filename(out_path, "lib", lib_count-1).data(), m_cur_dpi, perr);
-            actions.logAction(t, lib_count-1);
+            actions.logAction(t, lib_count-1, false, img_x, img_y);
             size = ftell(zp.file) - size;
             m_counters.count(Counters::BitmapsAddedToLocalDict, size);
         } break;
@@ -262,7 +267,7 @@ mdjvu_image_t JB2Dumper::loadAndDumpJB2Image(FILE * f, int32 length, const Share
                     = decode_lib_shape(jb2, img, false, NULL);
 
             mdjvu_save_bmp(library[lib_count-1], get_filename(out_path, "lib", lib_count-1).data(), m_cur_dpi, perr);
-            actions.logAction(t, lib_count-1);
+            actions.logAction(t, lib_count-1, false);
             size = ftell(zp.file) - size;
             m_counters.count(Counters::BitmapsAddedToLocalDict, size);
         } break;
@@ -273,7 +278,9 @@ mdjvu_image_t JB2Dumper::loadAndDumpJB2Image(FILE * f, int32 length, const Share
             jb2.decode_blit(img, index-1);
 
             mdjvu_save_bmp(mdjvu_image_get_bitmap(img, index), get_filename(out_path, "img", index).data(), m_cur_dpi, perr);
-            actions.logAction(t, index);
+
+            int32 last_blit = mdjvu_image_get_blit_count(img) - 1;
+            actions.logAction(t, index, false, mdjvu_image_get_blit_x(img, last_blit), mdjvu_image_get_blit_y(img, last_blit));
             size = ftell(zp.file) - size;
             m_counters.count(Counters::UniqElementsOnPage, size);
         } break;
@@ -287,11 +294,12 @@ mdjvu_image_t JB2Dumper::loadAndDumpJB2Image(FILE * f, int32 length, const Share
             }
             jb2.matching_symbol_index.set_interval(0, lib_count - 1);
             int32 match = zp.decode(jb2.matching_symbol_index);
+            int32 img_x; int32 img_y;
             *(append_to_list<mdjvu_bitmap_t>(library, lib_count, lib_alloc))
-                    = decode_lib_shape(jb2, img, true, library[match]);
+                    = decode_lib_shape(jb2, img, true, library[match], &img_x, &img_y);
 
             mdjvu_save_bmp(library[lib_count-1], get_filename(out_path, "lib", lib_count-1).data(), m_cur_dpi, perr);
-            actions.logAction(t, lib_count-1);
+            actions.logAction(t, lib_count-1, false, img_x, img_y);
             size = ftell(zp.file) - size;
             m_counters.count(Counters::BitmapsAddedToLocalDict, size);
         } break;
@@ -309,7 +317,7 @@ mdjvu_image_t JB2Dumper::loadAndDumpJB2Image(FILE * f, int32 length, const Share
                     = decode_lib_shape(jb2, img, false, library[match]);
 
             mdjvu_save_bmp(library[lib_count-1], get_filename(out_path, "lib", lib_count-1).data(), m_cur_dpi, perr);
-            actions.logAction(t, lib_count-1);
+            actions.logAction(t, lib_count-1, false);
             size = ftell(zp.file) - size;
             m_counters.count(Counters::BitmapsAddedToLocalDict, size);
         } break;
@@ -328,7 +336,8 @@ mdjvu_image_t JB2Dumper::loadAndDumpJB2Image(FILE * f, int32 length, const Share
             jb2.decode_blit(img, index-1);
 
             mdjvu_save_bmp(mdjvu_image_get_bitmap(img, index), get_filename(out_path, "img", index).data(), m_cur_dpi, perr);
-            actions.logAction(t, index, index < shared_lib_size_used);
+            int32 last_blit = mdjvu_image_get_blit_count(img) - 1;
+            actions.logAction(t, index, index < shared_lib_size_used, mdjvu_image_get_blit_x(img, last_blit), mdjvu_image_get_blit_y(img, last_blit));
             size = ftell(zp.file) - size;
             if (index < shared_lib_size_used) {
                 m_counters.count(Counters::SharedDictUsage, size);
@@ -363,7 +372,7 @@ mdjvu_image_t JB2Dumper::loadAndDumpJB2Image(FILE * f, int32 length, const Share
             mdjvu_image_add_blit(img, x, y, shape);
 
             mdjvu_save_bmp(shape, get_filename(out_path, "lib", match).data(), m_cur_dpi, perr);
-            actions.logAction(t, match, match < shared_lib_size_used);
+            actions.logAction(t, match, match < shared_lib_size_used, x, y);
             size = ftell(zp.file) - size;
             if (match < shared_lib_size_used) {
                 m_counters.count(Counters::SharedDictUsage, size);
@@ -379,7 +388,7 @@ mdjvu_image_t JB2Dumper::loadAndDumpJB2Image(FILE * f, int32 length, const Share
             int32 index = mdjvu_image_get_bitmap_count(img);
             mdjvu_image_add_blit(img, x, y, bmp);
             mdjvu_save_bmp(bmp, get_filename(out_path, "non_symb", index).data(), m_cur_dpi, perr);
-            actions.logAction(t, index);
+            actions.logAction(t, index, false, x, y);
             size = ftell(zp.file) - size;
             m_counters.count(Counters::UniqElementsOnPage, size);
         } break;
@@ -617,6 +626,19 @@ void LogFile::logAction(int32 action, int32 idx, bool in_shared_lib)
     assert(action < 12);
     if (m_stats_f) {
         fprintf(m_stats_f, "%s:\t%u%s\n", val_names[action], idx, in_shared_lib?" [shared dictionary usage]":"");
+        if (!in_shared_lib) {
+
+        } else {
+
+        }
+    }
+}
+
+void LogFile::logAction(int32 action, int32 idx, bool in_shared_lib, int x, int y)
+{
+    assert(action < 12);
+    if (m_stats_f) {
+        fprintf(m_stats_f, "%s:\tid: %u\tx: %u\ty: %u\t%s\n", val_names[action], idx, x, y, in_shared_lib?" [shared dictionary usage]":"");
         if (!in_shared_lib) {
 
         } else {

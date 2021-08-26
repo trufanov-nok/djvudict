@@ -97,7 +97,8 @@ public:
     void open(const char* fname);
     void log(const char* val);
     void log(const char* fmt, int32 val);
-    void logAction(int32 action, int32 idx, bool in_shared_lib = false);
+    void logAction(int32 action, int32 idx, bool in_shared_lib);
+    void logAction(int32 action, int32 idx, bool in_shared_lib, int x, int y);
     void logAction(int32 action);
     void close();
 private:
