@@ -1,5 +1,5 @@
 # djvudict
-A Minidjvu-based tool to dump Djbz and Sjbz content of DjVu documents to BMP images as well as gather statistics of dictionaries usage. It allows to investigate and compare the quality of different DjVu encoders (in scope of JB2 images).
+A Minidjvu-mod -based tool to dump Djbz and Sjbz content of DjVu documents to BMP images as well as gather statistics of dictionaries usage. It allows to investigate and compare the quality of different DjVu encoders (in scope of JB2 images).
 
 # DjVu dictionaries in a nutshell
 There are several DjVu encoders that allows to encode DjVu document from images. Depending on their settings they produce djvu files of different size. One of the reason for that is that encoders organizes dictionaries in file in a sightly different way.
@@ -20,7 +20,7 @@ Each DjVu encoder basically do following for one or several images it needs to e
 4. Decide which letters may go to a shared dictionary, which to a local dictionary (not used on other pages) and which are unique for page and should be just encoded in it.
 5. Decide which "representatives" in dictionaries or pages may be additionally compressed by choosing a prototype and refinement encoding.
 
-Especially important is step 3. On step 5 you can't damage the resulting image in comparison to it's original bcs it's all just about effective bitmap compression without changing it. But on step 3 you choose one single bitmap that will replace all occurrences of letters of the same class. (for ex., minidjvu chooses 1st bitmap among bitmaps classified to single class or tries to draw new averaged bitmap based on them if `--Averaging` param is specified).
+Especially important is step 3. On step 5 you can't damage the resulting image in comparison to it's original bcs it's all just about effective bitmap compression without changing it. But on step 3 you choose one single bitmap that will replace all occurrences of letters of the same class. (for ex., minidjvu-mod chooses 1st bitmap among bitmaps classified to single class or tries to draw new averaged bitmap based on them if `--Averaging` param is specified).
 
 As you can see that's a very complex problem and different encoders solve it differently. They also may have different settings that affect the result in a different way.
 

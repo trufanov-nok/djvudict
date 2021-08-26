@@ -1,6 +1,6 @@
 #ifndef DJVUDIRREADER_H
 #define DJVUDIRREADER_H
-#include <../include/minidjvu/minidjvu.h>
+#include "../include/minidjvu-mod/minidjvu-mod.h"
 #include <stdio.h>
 
 enum DIRM_EntryType {

@@ -1,8 +1,8 @@
 /*
- * minidjvu.c - an example of using the library
+ * 
  */
 
-#include <minidjvu/minidjvu.h>
+#include "../include/minidjvu-mod/minidjvu-mod.h"
 #include "../src/base/mdjvucfg.h" /* for i18n, HAVE_LIBTIFF */
 #include <stdlib.h>
 #include <stdio.h>

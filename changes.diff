@@ -1,63 +1,48 @@
 diff --git a/Makefile.am b/Makefile.am
-index 078b6d7..c3083e0 100644
+index 88a469c..6a465bf 100644
 --- a/Makefile.am
 +++ b/Makefile.am
-@@ -38,12 +38,16 @@ libminidjvu_la_SOURCES = src/matcher/no_mdjvu.h src/matcher/bitmaps.h	\
-  src/djvu/bs.cpp src/jb2/jb2coder.cpp src/jb2/bmpcoder.cpp		\
-  src/jb2/jb2load.cpp src/jb2/zp.cpp src/jb2/jb2save.cpp
+@@ -57,12 +57,16 @@ libminidjvu_mod_settings_la_SOURCES = \
+  tools/settings-reader/AppOptions.cpp tools/settings-reader/AppOptions.h		\
+  tools/settings-reader/SettingsReaderAdapter.cpp
  
--bin_PROGRAMS = minidjvu
-+bin_PROGRAMS = minidjvu djvudict
+-bin_PROGRAMS = minidjvu-mod
++bin_PROGRAMS = minidjvu-mod djvudict
  
- minidjvu_SOURCES = tools/minidjvu.c
+ minidjvu_mod_SOURCES = tools/minidjvu-mod.c
  
- minidjvu_LDADD = libminidjvu.la
+ minidjvu_mod_LDADD = libminidjvu-mod.la libminidjvu-mod-settings.la
  
 +djvudict_SOURCES = tools/djvudict.cpp tools/bsdecoder.cpp tools/djvudirreader.cpp tools/jb2dumper.cpp
 +
-+djvudict_LDADD = libminidjvu.la
++djvudict_LDADD = libminidjvu-mod.la
 +
- minidjvu.pc:
+ minidjvu-mod.pc:
  	echo 'prefix=$(prefix)'			>  $@
  	echo 'exec_prefix=$(exec_prefix)'	>> $@
 diff --git a/src/jb2/jb2coder.h b/src/jb2/jb2coder.h
-index 89f61fb..af8d63d 100644
+index 89f61fb..5aed23d 100644
 --- a/src/jb2/jb2coder.h
 +++ b/src/jb2/jb2coder.h
-@@ -9,6 +9,7 @@
- 
- // struct JB2Rect - a simple rectangle class {{{
- 
-+
- struct JB2Rect
- {
-     int left, top, width, height;
-@@ -81,7 +82,7 @@ struct JB2Decoder : JB2Coder, JB2BitmapDecoder
+@@ -81,7 +81,7 @@ struct JB2Decoder : JB2Coder, JB2BitmapDecoder
  
      void reset(); // resets numcontexts as required by "reset" record
  
 -    private:
-+//    private:
++    //private:
          void decode_character_position(int32 &x, int32 &y, int32 w, int32 h);
  };
  
 diff --git a/src/jb2/zp.h b/src/jb2/zp.h
-index ccad29f..69475b8 100644
+index 82d1352..49a6a55 100644
 --- a/src/jb2/zp.h
 +++ b/src/jb2/zp.h
-@@ -94,7 +94,6 @@ class ZPEncoder
-         void encode(Bit, ZPBitContext &);
-         void encode(int32, ZPNumContext &);
-         void close();
--
-     private:
-         FILE *file;
-         void emit_byte(unsigned char);
-@@ -119,8 +118,8 @@ class ZPDecoder
+@@ -119,8 +119,9 @@ class ZPDecoder
          Bit decode_without_context();
          Bit decode(ZPBitContext &);
          int32 decode(ZPNumContext &);
 -    private:
++
          FILE *file;
 +    private:
          uint32 a, code, fence, buffer;
