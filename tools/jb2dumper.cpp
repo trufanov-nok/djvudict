@@ -222,11 +222,14 @@ mdjvu_image_t JB2Dumper::loadAndDumpJB2Image(FILE * f, int32 length, const Share
             if (perr) *perr = mdjvu_get_error(mdjvu_error_corrupted_jb2);
             //COMPLAIN;
         }
-        if (shared_library->count < lib_count) {
-            fprintf(stderr, "JB2 Image requires %u images but shared library has only", shared_library->count);
-            COMPLAIN;
+
+        if (shared_library) {
+            if (shared_library->count < lib_count) {
+                fprintf(stderr, "JB2 Image requires %u images but shared library has only", shared_library->count);
+                COMPLAIN;
+            }
+            library = clone_library(shared_library->bitmaps, lib_count);
         }
-        library = clone_library(shared_library->bitmaps, lib_count);
         t = jb2.decode_record_type(); // read jb2_start_of_image
         m_counters.count((Counters::CountersType)t);
         actions.logAction(t);
@@ -545,7 +548,7 @@ int JB2Dumper::dumpMultiPage(FILE * f, const DIRM_Entry* entries, int size, cons
         }
 
         IFFChunk FORM;
-        get_child_chunk(f, &FORM, NULL); // no parent chunk as we already know all ofsets and can fseek
+        get_child_chunk(f, &FORM, NULL); // no parent chunk as we already know all offsets and can fseek
         if (!find_sibling_chunk(f, &FORM, CHUNK_ID_FORM))
         {
             fprintf(stderr, "No FORM tag found.\n");
