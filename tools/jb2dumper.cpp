@@ -172,7 +172,7 @@ static mdjvu_bitmap_t decode_lib_shape/*{{{*/
         mdjvu_image_set_blit_x(img, blit, x);
         mdjvu_image_set_blit_y(img, blit, y);
         if (img_x) *img_x = x;
-        if (img_y) *img_y = x;
+        if (img_y) *img_y = y;
     }
 
     return shape;
