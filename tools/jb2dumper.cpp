@@ -567,7 +567,7 @@ int JB2Dumper::dumpMultiPage(FILE * f, const DIRM_Entry* entries, int size, cons
                 *dict = res;
                 dict->id = entry.id_str;
             } else {
-                return 0;
+              //  return 0;
             }
         } else if (id == ID_DJVU) {
             dumpSjbz(f, &FORM, get_subdir(out_path, entry.id_str, i).data(), p_err);
