@@ -479,8 +479,8 @@ int JB2Dumper::dumpSjbz(FILE *f, IFFChunk *form, const char* out_path, mdjvu_err
             assert(chunk.length >= 10);
             m_cur_dpi = info[6] | info[7] << 8;
             if (m_verbose) {
-                fprintf(stdout, "Reading page Info: w:%u h:%u ver:%u.%u dpi:%u\n",
-                        info[1]|info[0]<<8, info[3]|info[2]<<8, info[5], info[4], m_cur_dpi);
+                fprintf(stdout, "Reading page Info: w:%u h:%u ver:%u dpi:%u\n",
+                        info[1]|info[0]<<8, info[3]|info[2]<<8, (info[5]<<8)+info[4], m_cur_dpi);
             }
             free(info);
         }
