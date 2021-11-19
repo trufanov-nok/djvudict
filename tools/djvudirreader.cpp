@@ -27,7 +27,7 @@ inline void skip_till_next_str(const char* buf, int& pos)
 
 DjVuDirReader::DjVuDirReader(): m_entries_cnt(0), m_entries(NULL), m_buf(NULL) {}
 
-int DjVuDirReader::decode(FILE * f, int32 size, mdjvu_error_t *perr, bool verbose)
+int DjVuDirReader::decode(FILE * f, int32 size, mdjvu_error_t *perr, Options *opts)
 {
     assert(size >= 3);
 
@@ -39,13 +39,13 @@ int DjVuDirReader::decode(FILE * f, int32 size, mdjvu_error_t *perr, bool verbos
         if (perr) *perr = mdjvu_get_error(mdjvu_error_corrupted_djvu);
         return 0;
     }
-    if (verbose) {
+    if (opts->verbose) {
         fprintf(stdout, "Bundled DjVu found. DIRM reports format version %u\n", flags & 0x7F /*0b01111111*/);
     }
 
     m_entries_cnt = read_uint16_most_significant_byte_first(f);
 
-    if (verbose) {
+    if (opts->verbose) {
         fprintf(stdout, "Files bundled %u\n", m_entries_cnt);
     }
 

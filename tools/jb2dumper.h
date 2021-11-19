@@ -1,7 +1,12 @@
 #ifndef JB2DUMPER_H
 #define JB2DUMPER_H
 
+#include "djvudict_options.h"
 #include "djvudirreader.h"
+#include "config.h"
+#ifdef HAVE_LIBSQLITE3
+#include "sqlstorage.h"
+#endif
 #include <string>
 
 #define CHUNK_ID_AT_AND_T 0x41542654
@@ -73,10 +78,10 @@ public:
     JB2Dumper();
     ~JB2Dumper();
     void close();
-    int dumpMultiPage(FILE *f, const DIRM_Entry* entries, int size, const char* out_path, mdjvu_error_t *perr);
+    int dumpMultiPage(FILE *f, const DIRM_Entry* entries, int size, const char* out_path, mdjvu_error_t *perr, const struct Options* opts);
 private:
     int dumpDjbz(FILE *f, IFFChunk *form, const char* out_path, SharedDictInfo *local_dict, mdjvu_error_t* p_err);
-    int dumpSjbz(FILE *f, IFFChunk *form, const char* out_path, mdjvu_error_t* p_err);
+    int dumpSjbz(FILE *f, IFFChunk *form, const char* out_path, mdjvu_error_t* p_err, const Options *opts);
     mdjvu_image_t loadAndDumpJB2Image(FILE * f, int32 length, const SharedDictInfo* shared_library, SharedDictInfo* local_dict, const char* out_path, mdjvu_error_t *perr);
 
     Counters m_counters;
@@ -86,7 +91,10 @@ private:
     int m_dict_buf_allocated;
     const char* m_cur_output_folder;
     int m_cur_dpi;
-    bool m_verbose;
+    int m_cur_entry_no;
+#ifdef HAVE_LIBSQLITE3
+    SQLStorage m_sql;
+#endif
 };
 
 class LogFile

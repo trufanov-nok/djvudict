@@ -20,7 +20,11 @@ const char _dir_sep = '\\';
 const char _dir_sep = '/';
 #endif
 
-char used_dir_sep(const std::string& s)
+#ifdef HAVE_LIBSQLITE3
+static int _save_to_sql = 0;
+#endif
+
+static char dir_sep_used(const std::string& s)
 {
     const bool slash = s.find_first_of('/',0) !=std::string::npos;
     const bool backslash = s.find_first_of('\\',0) !=std::string::npos;
@@ -28,9 +32,9 @@ char used_dir_sep(const std::string& s)
     return _dir_sep;
 }
 
-int mkpath(std::string path, int mode = 0755)
+static int mkpath(std::string path, int mode = 0755)
 {
-    char used_sep = used_dir_sep(path);
+    char used_sep = dir_sep_used(path);
 
     if (path.empty()) {
         return 0;
@@ -55,27 +59,27 @@ int mkpath(std::string path, int mode = 0755)
     return 0;
 }
 
-std::string get_subdir(std::string path, const std::string dir, int id)
+static std::string get_subdir(std::string path, const std::string dir, int id)
 {
-    char used_sep = used_dir_sep(path);
+    char used_sep = dir_sep_used(path);
     if ( path[path.length()-1] != used_sep) {
         path += used_sep;
     }
     return path + std::to_string(id) + '_' + dir + used_sep;
 }
 
-std::string get_filename(std::string path, std::string name)
+static std::string get_filename(std::string path, std::string name)
 {
-    char used_sep = used_dir_sep(path);
+    char used_sep = dir_sep_used(path);
     if ( path[path.length()-1] != used_sep) {
         path += used_sep;
     }
     return path + name + ".bmp";
 }
 
-std::string get_filename(std::string path, std::string prefix, int id, int padding = 5)
+static std::string get_filename(std::string path, std::string prefix, int id, int padding = 5)
 {
-    char used_sep = used_dir_sep(path);
+    char used_sep = dir_sep_used(path);
     if ( path[path.length()-1] != used_sep) {
         path += used_sep;
     }
@@ -85,16 +89,26 @@ std::string get_filename(std::string path, std::string prefix, int id, int paddi
     if (!prefix.empty()) prefix += '_';
     return path + prefix + num + ".bmp";
 }
-std::string get_statsname(std::string path, std::string filename)
+
+static std::string get_statsname(std::string path, std::string filename)
 {
-    char used_sep = used_dir_sep(path);
+    char used_sep = dir_sep_used(path);
     if ( path[path.length()-1] != used_sep) {
         path += used_sep;
     }
     return path + filename;
 }
 
-JB2Dumper::JB2Dumper(): m_shared_dicts(NULL), m_shared_dict_cnt(0), m_dict_buf_allocated(0), m_cur_dpi(600), m_verbose(true)
+static std::string get_sqlname(std::string path)
+{
+    char used_sep = dir_sep_used(path);
+    if ( path[path.length()-1] != used_sep) {
+        path += used_sep;
+    }
+    return path + "djvu_sqlite.db";
+}
+
+JB2Dumper::JB2Dumper(): m_shared_dicts(NULL), m_shared_dict_cnt(0), m_dict_buf_allocated(0), m_cur_dpi(600), m_cur_entry_no(0)
 {
 }
 
@@ -121,7 +135,7 @@ void JB2Dumper::close()
     }
 }
 
-mdjvu_bitmap_t * clone_library(mdjvu_bitmap_t * library, int32 size)
+static mdjvu_bitmap_t * clone_library(mdjvu_bitmap_t * library, int32 size)
 {
     if (!library || size == 0) {
         return NULL;
@@ -229,6 +243,11 @@ mdjvu_image_t JB2Dumper::loadAndDumpJB2Image(FILE * f, int32 length, const Share
                 COMPLAIN;
             }
             library = clone_library(shared_library->bitmaps, lib_count);
+#ifdef HAVE_LIBSQLITE3
+            if (_save_to_sql) {
+                m_sql.use_djbz(shared_library->id);
+            }
+#endif
         }
         t = jb2.decode_record_type(); // read jb2_start_of_image
         m_counters.count((Counters::CountersType)t);
@@ -240,13 +259,13 @@ mdjvu_image_t JB2Dumper::loadAndDumpJB2Image(FILE * f, int32 length, const Share
 
     if (t != jb2_start_of_image) COMPLAIN;
 
-    int32 w = zp.decode(jb2.image_size);
-    int32 h = zp.decode(jb2.image_size);
+    const int32 page_w = zp.decode(jb2.image_size);
+    const int32 page_h = zp.decode(jb2.image_size);
     zp.decode(jb2.eventual_image_refinement); // dropped
-    jb2.symbol_column_number.set_interval(1, !w?1:w);
-    jb2.symbol_row_number.set_interval(1, !h?1:h);
+    jb2.symbol_column_number.set_interval(1, !page_w?1:page_w);
+    jb2.symbol_row_number.set_interval(1, !page_h?1:page_h);
 
-    mdjvu_image_t img = mdjvu_image_create(w, h); /* d is dropped for now - XXX*/
+    mdjvu_image_t img = mdjvu_image_create(page_w, page_h); /* d is dropped for now - XXX*/
 
     while(1)
     {
@@ -259,20 +278,47 @@ mdjvu_image_t JB2Dumper::loadAndDumpJB2Image(FILE * f, int32 length, const Share
             size = ftell(zp.file);
             *(append_to_list<mdjvu_bitmap_t>(library, lib_count, lib_alloc))
                     = decode_lib_shape(jb2, img, true, NULL, &img_x, &img_y);
-            mdjvu_save_bmp(library[lib_count-1], get_filename(out_path, "lib", lib_count-1).data(), m_cur_dpi, perr);
+            const std::string filename = get_filename(out_path, "lib", lib_count-1);
+            mdjvu_save_bmp(library[lib_count-1], filename.data(), m_cur_dpi, perr);
+            if (page_h) {
+                img_y = page_h - img_y; // return (0,0) to left bottom corner
+                assert(img_y >= 0);
+            }
             actions.logAction(t, lib_count-1, false, img_x, img_y);
             size = ftell(zp.file) - size;
             m_counters.count(Counters::BitmapsAddedToLocalDict, size);
+#ifdef HAVE_LIBSQLITE3
+            if (_save_to_sql) {
+                const mdjvu_bitmap_t l_img = library[lib_count-1];
+                const int img_w = mdjvu_bitmap_get_width(l_img);
+                const int img_h = mdjvu_bitmap_get_height(l_img);
+                m_sql.add_letter(lib_count-1, img_x, img_y,  img_w,  img_h,
+                                 1 /*to_image*/, 1 /*to_library*/, 0 /*is_symbol*/,
+                                 -1 /*ref_local_id*/, 0 /*from_djbz*/,
+                                 0 /*is_refinement*/, filename.data());
+            }
+#endif
         } break;
         case jb2_new_symbol_add_to_library_only: {
             size = ftell(zp.file);
             *(append_to_list<mdjvu_bitmap_t>(library, lib_count, lib_alloc))
                     = decode_lib_shape(jb2, img, false, NULL);
 
-            mdjvu_save_bmp(library[lib_count-1], get_filename(out_path, "lib", lib_count-1).data(), m_cur_dpi, perr);
+            const std::string filename = get_filename(out_path, "lib", lib_count-1);
+            mdjvu_save_bmp(library[lib_count-1], filename.data(), m_cur_dpi, perr);
             actions.logAction(t, lib_count-1, false);
             size = ftell(zp.file) - size;
             m_counters.count(Counters::BitmapsAddedToLocalDict, size);
+#ifdef HAVE_LIBSQLITE3
+            if (_save_to_sql) {
+                const int img_w = mdjvu_bitmap_get_width(library[lib_count-1]);
+                const int img_h = mdjvu_bitmap_get_height(library[lib_count-1]);
+                m_sql.add_letter(lib_count-1, 0, 0,  img_w,  img_h,
+                                 0 /*to_image*/, 1 /*to_library*/, 0 /*is_symbol*/,
+                                 -1 /*ref_local_id*/, 0 /*from_djbz*/,
+                                 0 /*is_refinement*/, filename.data());
+            }
+#endif
         } break;
         case jb2_new_symbol_add_to_image_only: {
             size = ftell(zp.file);
@@ -280,12 +326,31 @@ mdjvu_image_t JB2Dumper::loadAndDumpJB2Image(FILE * f, int32 length, const Share
             int32 index = mdjvu_image_get_bitmap_count(img);
             jb2.decode_blit(img, index-1);
 
-            mdjvu_save_bmp(mdjvu_image_get_bitmap(img, index), get_filename(out_path, "img", index).data(), m_cur_dpi, perr);
+            const std::string filename = get_filename(out_path, "img", index);
+            const mdjvu_bitmap_t bitmap = mdjvu_image_get_bitmap(img, index);
+            mdjvu_save_bmp(bitmap, filename.data(), m_cur_dpi, perr);
 
             int32 last_blit = mdjvu_image_get_blit_count(img) - 1;
-            actions.logAction(t, index, false, mdjvu_image_get_blit_x(img, last_blit), mdjvu_image_get_blit_y(img, last_blit));
+            const int x = mdjvu_image_get_blit_x(img, last_blit);
+            int y = mdjvu_image_get_blit_y(img, last_blit);
+            if (page_h) {
+                y = page_h - y; // return (0,0) to left bottom corner
+                assert(y >= 0);
+            }
+
+            actions.logAction(t, index, false, x, y);
             size = ftell(zp.file) - size;
             m_counters.count(Counters::UniqElementsOnPage, size);
+#ifdef HAVE_LIBSQLITE3
+            if (_save_to_sql) {
+                const int img_w = mdjvu_bitmap_get_width(bitmap);
+                const int img_h = mdjvu_bitmap_get_height(bitmap);
+                m_sql.add_letter(-1, x, y,  img_w,  img_h,
+                                 1 /*to_image*/, 0 /*to_library*/, 0 /*is_symbol*/,
+                                 -1 /*ref_local_id*/, 0 /*from_djbz*/,
+                                 0 /*is_refinement*/, filename.data());
+            }
+#endif
         } break;
         case jb2_matched_symbol_with_refinement_add_to_image_and_library: {
             size = ftell(zp.file);
@@ -300,11 +365,27 @@ mdjvu_image_t JB2Dumper::loadAndDumpJB2Image(FILE * f, int32 length, const Share
             int32 img_x; int32 img_y;
             *(append_to_list<mdjvu_bitmap_t>(library, lib_count, lib_alloc))
                     = decode_lib_shape(jb2, img, true, library[match], &img_x, &img_y);
+            if (page_h) {
+                img_y = page_h - img_y; // return (0,0) to left bottom corner
+                assert(img_y >= 0);
+            }
 
-            mdjvu_save_bmp(library[lib_count-1], get_filename(out_path, "lib", lib_count-1).data(), m_cur_dpi, perr);
+            const std::string filename = get_filename(out_path, "lib", lib_count-1);
+            mdjvu_save_bmp(library[lib_count-1], filename.data(), m_cur_dpi, perr);
             actions.logAction(t, lib_count-1, false, img_x, img_y);
             size = ftell(zp.file) - size;
             m_counters.count(Counters::BitmapsAddedToLocalDict, size);
+
+#ifdef HAVE_LIBSQLITE3
+            if (_save_to_sql) {
+                const int img_w = mdjvu_bitmap_get_width(library[lib_count-1]);
+                const int img_h = mdjvu_bitmap_get_height(library[lib_count-1]);
+                m_sql.add_letter(lib_count-1, img_x, img_y,  img_w,  img_h,
+                                 1 /*to_image*/, 1 /*to_library*/, 0 /*is_symbol*/,
+                                 match /*ref_local_id*/, match < shared_lib_size_used /*from_djbz*/,
+                                 1 /*is_refinement*/, filename.data());
+            }
+#endif
         } break;
         case jb2_matched_symbol_with_refinement_add_to_library_only: {
             size = ftell(zp.file);
@@ -319,10 +400,29 @@ mdjvu_image_t JB2Dumper::loadAndDumpJB2Image(FILE * f, int32 length, const Share
             *(append_to_list<mdjvu_bitmap_t>(library, lib_count, lib_alloc))
                     = decode_lib_shape(jb2, img, false, library[match]);
 
-            mdjvu_save_bmp(library[lib_count-1], get_filename(out_path, "lib", lib_count-1).data(), m_cur_dpi, perr);
+            const std::string filename = get_filename(out_path, "lib", lib_count-1);
+            mdjvu_save_bmp(library[lib_count-1], filename.data(), m_cur_dpi, perr);
             actions.logAction(t, lib_count-1, false);
             size = ftell(zp.file) - size;
             m_counters.count(Counters::BitmapsAddedToLocalDict, size);
+#ifdef HAVE_LIBSQLITE3
+            if (_save_to_sql) {
+                int32 last_blit = mdjvu_image_get_blit_count(img) - 1;
+                const int x = mdjvu_image_get_blit_x(img, last_blit);
+                int y = mdjvu_image_get_blit_y(img, last_blit);
+                if (page_h) {
+                    y = page_h - y; // return (0,0) to left bottom corner
+                    assert(y >= 0);
+                }
+
+                const int img_w = mdjvu_bitmap_get_width(library[lib_count-1]);
+                const int img_h = mdjvu_bitmap_get_height(library[lib_count-1]);
+                m_sql.add_letter(lib_count-1, x, y,  img_w,  img_h,
+                                 0 /*to_image*/, 1 /*to_library*/, 0 /*is_symbol*/,
+                                 match /*ref_local_id*/, match < shared_lib_size_used /*from_djbz*/,
+                                 1 /*is_refinement*/, filename.data());
+            }
+#endif
         } break;
         case jb2_matched_symbol_with_refinement_add_to_image_only: {
             size = ftell(zp.file);
@@ -338,9 +438,18 @@ mdjvu_image_t JB2Dumper::loadAndDumpJB2Image(FILE * f, int32 length, const Share
             int32 index = mdjvu_image_get_bitmap_count(img);
             jb2.decode_blit(img, index-1);
 
-            mdjvu_save_bmp(mdjvu_image_get_bitmap(img, index), get_filename(out_path, "img", index).data(), m_cur_dpi, perr);
+            const std::string filename = get_filename(out_path, "img", index);
+            const mdjvu_bitmap_t bitmap = mdjvu_image_get_bitmap(img, index);
+            mdjvu_save_bmp(bitmap, filename.data(), m_cur_dpi, perr);
             int32 last_blit = mdjvu_image_get_blit_count(img) - 1;
-            actions.logAction(t, index, index < shared_lib_size_used, mdjvu_image_get_blit_x(img, last_blit), mdjvu_image_get_blit_y(img, last_blit));
+            const int32 x = mdjvu_image_get_blit_x(img, last_blit);
+            int32 y = mdjvu_image_get_blit_y(img, last_blit);
+            if (page_h) {
+                y = page_h - y; // return (0,0) to left bottom corner
+                assert(y >= 0);
+            }
+
+            actions.logAction(t, index, index < shared_lib_size_used, x, y);
             size = ftell(zp.file) - size;
             if (index < shared_lib_size_used) {
                 m_counters.count(Counters::SharedDictUsage, size);
@@ -348,6 +457,16 @@ mdjvu_image_t JB2Dumper::loadAndDumpJB2Image(FILE * f, int32 length, const Share
                 m_counters.count(Counters::LocalDictUsage), size;
             }
             m_counters.count(Counters::UniqElementsOnPage, size);
+
+#ifdef HAVE_LIBSQLITE3
+            if (_save_to_sql) {
+                m_sql.add_letter(-1, x, y,  mdjvu_bitmap_get_width(bitmap),  mdjvu_bitmap_get_height(bitmap),
+                                 1 /*to_image*/, 0 /*to_library*/, 0 /*is_symbol*/,
+                                 match /*ref_local_id*/, match < shared_lib_size_used /*from_djbz*/,
+                                 1 /*is_refinement*/, filename.data());
+            }
+#endif
+
         } break;
         case jb2_matched_symbol_copy_to_image_without_refinement: {
             size = ftell(zp.file);
@@ -372,9 +491,14 @@ mdjvu_image_t JB2Dumper::loadAndDumpJB2Image(FILE * f, int32 length, const Share
             int32 hs = mdjvu_bitmap_get_height(shape);
             int32 x, y;
             jb2.decode_character_position(x, y, ws, hs);
+            if (page_h) {
+                y = page_h - y; // return (0,0) to left bottom corner
+                assert(y >= 0);
+            }
             mdjvu_image_add_blit(img, x, y, shape);
 
-            mdjvu_save_bmp(shape, get_filename(out_path, "lib", match).data(), m_cur_dpi, perr);
+            const std::string filename = get_filename(out_path, "lib", match);
+            mdjvu_save_bmp(shape, filename.data(), m_cur_dpi, perr);
             actions.logAction(t, match, match < shared_lib_size_used, x, y);
             size = ftell(zp.file) - size;
             if (match < shared_lib_size_used) {
@@ -382,18 +506,42 @@ mdjvu_image_t JB2Dumper::loadAndDumpJB2Image(FILE * f, int32 length, const Share
             } else {
                 m_counters.count(Counters::LocalDictUsage, size);
             }
+
+#ifdef HAVE_LIBSQLITE3
+            if (_save_to_sql) {
+                m_sql.add_letter(-1, x, y,  ws,  hs,
+                                 1 /*to_image*/, 0 /*to_library*/, 0 /*is_symbol*/,
+                                 match /*ref_local_id*/, match < shared_lib_size_used /*from_djbz*/,
+                                 1 /*is_refinement*/, filename.data());
+            }
+#endif
         } break;
         case jb2_non_symbol_data: {
             size = ftell(zp.file);
             mdjvu_bitmap_t bmp = jb2.decode(img);
             int32 x = zp.decode(jb2.symbol_column_number) - 1;
-            int32 y = h - zp.decode(jb2.symbol_row_number);
+            int32 y = zp.decode(jb2.symbol_row_number);
+            if (page_h) {
+                y = page_h - y; // return (0,0) to left bottom corner
+                assert(y >= 0);
+            }
             int32 index = mdjvu_image_get_bitmap_count(img);
             mdjvu_image_add_blit(img, x, y, bmp);
-            mdjvu_save_bmp(bmp, get_filename(out_path, "non_symb", index).data(), m_cur_dpi, perr);
+            const std::string filename = get_filename(out_path, "non_symb", index);
+            mdjvu_save_bmp(bmp, filename.data(), m_cur_dpi, perr);
             actions.logAction(t, index, false, x, y);
             size = ftell(zp.file) - size;
             m_counters.count(Counters::UniqElementsOnPage, size);
+#ifdef HAVE_LIBSQLITE3
+            if (_save_to_sql) {
+                const int img_w = mdjvu_bitmap_get_width(bmp);
+                const int img_h = mdjvu_bitmap_get_height(bmp);
+                m_sql.add_letter(-1, x, y,  img_w,  img_h,
+                                 1 /*to_image*/, 0 /*to_library*/, 1 /*is_symbol*/,
+                                 -1 /*ref_local_id*/, 0 /*from_djbz*/,
+                                 0 /*is_refinement*/, filename.data());
+            }
+#endif
         } break;
 
         case jb2_require_dictionary_or_reset: {
@@ -445,6 +593,12 @@ static void skip_whole_chunk_aligned(FILE* f, IFFChunk *chunk, unsigned len) {
 
 int JB2Dumper::dumpDjbz(FILE *f, IFFChunk *form, const char* out_path, SharedDictInfo* local_dict, mdjvu_error_t* p_err)
 {   // Form marked as DJVI
+#ifdef HAVE_LIBSQLITE3
+    if (_save_to_sql) {
+        m_sql.start_new_djbz();
+    }
+#endif
+
     IFFChunk dict;
     get_child_chunk(f, &dict, form);
     if (find_sibling_chunk(f, &dict, CHUNK_ID_Djbz)) {
@@ -457,10 +611,16 @@ int JB2Dumper::dumpDjbz(FILE *f, IFFChunk *form, const char* out_path, SharedDic
             }
         }
     }
+#ifdef HAVE_LIBSQLITE3
+    if (_save_to_sql) {
+        m_sql.endof_djbz();
+    }
+#endif
+
     return 0;
 }
 
-int JB2Dumper::dumpSjbz(FILE *f, IFFChunk *form, const char* out_path, mdjvu_error_t* p_err)
+int JB2Dumper::dumpSjbz(FILE *f, IFFChunk *form, const char* out_path, mdjvu_error_t* p_err, const struct Options* opts)
 {   // Form marked as DJVU
     assert(form);
 
@@ -474,14 +634,20 @@ int JB2Dumper::dumpSjbz(FILE *f, IFFChunk *form, const char* out_path, mdjvu_err
         switch (chunk.id) {
         case CHUNK_ID_INFO: {
             unsigned char * info =  (unsigned char *) calloc(chunk.length, sizeof(char));
-            int32 readed = fread(info, 1, chunk.length, f);
-            assert(readed = chunk.length);
+            const int32 readen = fread(info, 1, chunk.length, f);
+            assert(readen == chunk.length);
             assert(chunk.length >= 10);
             m_cur_dpi = info[6] | info[7] << 8;
-            if (m_verbose) {
+
+            if (opts->verbose) {
                 fprintf(stdout, "Reading page Info: w:%u h:%u ver:%u dpi:%u\n",
                         info[1]|info[0]<<8, info[3]|info[2]<<8, (info[5]<<8)+info[4], m_cur_dpi);
             }
+#ifdef HAVE_LIBSQLITE3
+            if (_save_to_sql) {
+                m_sql.start_new_sjbz(info[1]|info[0]<<8, info[3]|info[2]<<8, (info[5]<<8)+info[4], m_cur_dpi);
+            }
+#endif
             free(info);
         }
             break;
@@ -522,7 +688,7 @@ int JB2Dumper::dumpSjbz(FILE *f, IFFChunk *form, const char* out_path, mdjvu_err
     return 0;
 }
 
-int JB2Dumper::dumpMultiPage(FILE * f, const DIRM_Entry* entries, int size, const char* out_path, mdjvu_error_t *p_err)
+int JB2Dumper::dumpMultiPage(FILE * f, const DIRM_Entry* entries, int size, const char* out_path, mdjvu_error_t *p_err, const Options *opts)
 {
     if (mkpath(out_path)) {
         return 0;
@@ -532,10 +698,21 @@ int JB2Dumper::dumpMultiPage(FILE * f, const DIRM_Entry* entries, int size, cons
     totalLog.open(get_statsname(out_path, "stats.log").data());
     m_counters.clear();
 
-    int32 i;
-    for (i = 0; i < size; i++)
+#ifdef HAVE_LIBSQLITE3
+    _save_to_sql = opts->save_to_sql;
+    if (_save_to_sql) {
+        const std::string sql_path = get_sqlname(out_path);
+        if ( !m_sql.init(sql_path.c_str()) ) {
+            exit(3);
+        };
+    }
+#endif
+
+
+    m_cur_entry_no = 0;
+    for (m_cur_entry_no = 0; m_cur_entry_no < size; m_cur_entry_no++)
     {
-        const DIRM_Entry& entry = entries[i];
+        const DIRM_Entry& entry = entries[m_cur_entry_no];
 
         if (entry.type == Thumbnails) {
             continue;
@@ -559,10 +736,17 @@ int JB2Dumper::dumpMultiPage(FILE * f, const DIRM_Entry* entries, int size, cons
         uint32 id = read_uint32_most_significant_byte_first(f);
         skip_in_chunk(&FORM, 4);
 
+        const std::string dump_path = get_subdir(out_path, entry.id_str, m_cur_entry_no);
+#ifdef HAVE_LIBSQLITE3
+        if (_save_to_sql) {
+            m_sql.start_new_form(m_cur_entry_no, entry.id_str, dump_path.data());
+        }
+#endif
+
         if (id == ID_DJVI) {
             SharedDictInfo res;
 
-            if (dumpDjbz(f, &FORM, get_subdir(out_path, entry.id_str, i).data(), &res, p_err)) {
+            if (dumpDjbz(f, &FORM, dump_path.data(), &res, p_err)) {
                 SharedDictInfo* dict = append_to_list<SharedDictInfo>(m_shared_dicts, m_shared_dict_cnt, m_dict_buf_allocated);
                 *dict = res;
                 dict->id = entry.id_str;
@@ -570,12 +754,21 @@ int JB2Dumper::dumpMultiPage(FILE * f, const DIRM_Entry* entries, int size, cons
               //  return 0;
             }
         } else if (id == ID_DJVU) {
-            dumpSjbz(f, &FORM, get_subdir(out_path, entry.id_str, i).data(), p_err);
+            dumpSjbz(f, &FORM, dump_path.data(), p_err, opts);
         }
-
+#ifdef HAVE_LIBSQLITE3
+        if (_save_to_sql) {
+            m_sql.endof_form();
+        }
+#endif
     }
 
     totalLog.close();
+#ifdef HAVE_LIBSQLITE3
+        if (_save_to_sql) {
+            m_sql.save_on_disk();
+        }
+#endif
     return 1;
 }
 

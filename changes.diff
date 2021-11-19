@@ -1,5 +1,5 @@
 diff --git a/Makefile.am b/Makefile.am
-index 88a469c..6a465bf 100644
+index e060b68..2e041af 100644
 --- a/Makefile.am
 +++ b/Makefile.am
 @@ -57,12 +57,16 @@ libminidjvu_mod_settings_la_SOURCES = \
@@ -13,13 +13,25 @@ index 88a469c..6a465bf 100644
  
  minidjvu_mod_LDADD = libminidjvu-mod.la libminidjvu-mod-settings.la
  
-+djvudict_SOURCES = tools/djvudict.cpp tools/bsdecoder.cpp tools/djvudirreader.cpp tools/jb2dumper.cpp
++djvudict_SOURCES = tools/djvudict.cpp tools/bsdecoder.cpp tools/djvudirreader.cpp tools/jb2dumper.cpp tools/sqlstorage.cpp
 +
 +djvudict_LDADD = libminidjvu-mod.la
 +
  minidjvu-mod.pc:
  	echo 'prefix=$(prefix)'			>  $@
  	echo 'exec_prefix=$(exec_prefix)'	>> $@
+diff --git a/configure.ac b/configure.ac
+index 878da64..3a99f07 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -34,6 +34,7 @@ AC_CHECK_LIB(z, inflate)
+ AC_CHECK_LIB(jpeg, jpeg_destroy_decompress)
+ AC_CHECK_LIB(tiff, TIFFOpen)
+ AC_CHECK_LIB(jemalloc,malloc)
++AC_CHECK_LIB(sqlite3, sqlite3_open)
+ # Check for OpenMP
+ AC_OPENMP
+ 
 diff --git a/src/jb2/jb2coder.h b/src/jb2/jb2coder.h
 index 89f61fb..5aed23d 100644
 --- a/src/jb2/jb2coder.h
