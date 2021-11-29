@@ -111,7 +111,7 @@ uint32 dump_djvu_dict(const char *djvu_filepath, const char *out_path, mdjvu_err
 
 static void show_usage_and_exit(void)           /* {{{ */
 {
-    const char *what_it_does = _("dumps djvu dictinaries content and usage statistics");
+    const char *what_it_does = _("dumps djvu dictionaries content and usage statistics");
     printf("djvudict %s - %s\n", DICT_DUMPER_VERSION, what_it_does);
     printf(_("Usage:\n"));
     printf(_("    djvudict [options] <input file> <output folder>\n"));
